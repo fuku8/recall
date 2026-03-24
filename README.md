@@ -23,6 +23,7 @@ You type a prompt
 - **Time-decay scoring** — Recent memories rank higher (30-day half-life)
 - **Multi-keyword boost** — Messages matching multiple keywords are prioritized
 - **Noise filtering** — Slash commands (`/exit`, `/clear`, etc.) are excluded
+- **Secret redaction** — API keys, tokens, passwords, and PEM keys are replaced with `[REDACTED]` before saving
 
 ## Requirements
 
@@ -42,6 +43,7 @@ chmod +x install.sh uninstall.sh
 This will:
 1. Add `UserPromptSubmit` and `Stop` hooks to `~/.claude/settings.json`
 2. Import all existing Claude Code session logs into the database
+3. Set `memory.db` permissions to 600 (owner-only read/write)
 
 ## Uninstall
 
@@ -84,6 +86,12 @@ python3 search_memory.py "search query" 20  # limit results
 | Setup | `git clone` + `./install.sh` | Plugin marketplace |
 
 Recall trades AI-powered memory curation for complete privacy and zero cost.
+
+## Security
+
+- **Secret redaction** — Patterns like `sk-*`, `ghp_*`, `xoxb-*`, `AIza*`, `api_key=...`, `token:...`, `password=...`, and PEM private keys are automatically replaced with `[REDACTED]` before being stored in the database
+- **File permissions** — `memory.db` is set to 600 (owner-only) during installation
+- **Fully local** — No data leaves your machine. No external API calls.
 
 ## License
 
