@@ -69,6 +69,12 @@ echo "Importing existing session logs..."
 cd "$RECALL_DIR"
 python3 import_all.py
 
+# --- Secure memory.db ---
+if [ -f "$RECALL_DIR/memory.db" ]; then
+  chmod 600 "$RECALL_DIR/memory.db"
+  echo "  Set memory.db permissions to 600 (owner-only)"
+fi
+
 echo ""
 echo "=== Installation complete ==="
 echo ""

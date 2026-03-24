@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Save Claude Code session conversations to SQLite FTS5."""
 import json
+import re
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -9,6 +10,26 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_PATH = SCRIPT_DIR / "memory.db"
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
+
+# Redact secrets before saving to database
+SECRET_PATTERNS = [
+    re.compile(r'(?i)(api[_-]?key|apikey)\s*[=:]\s*\S+'),
+    re.compile(r'(?i)(secret|token|password|passwd|pwd)\s*[=:]\s*\S+'),
+    re.compile(r'(?i)(authorization|bearer)\s*[=:]\s*\S+'),
+    re.compile(r'sk-[a-zA-Z0-9_-]{20,}'),          # OpenAI/Anthropic style keys
+    re.compile(r'ghp_[a-zA-Z0-9]{36,}'),            # GitHub PAT
+    re.compile(r'gho_[a-zA-Z0-9]{36,}'),            # GitHub OAuth
+    re.compile(r'xoxb-[a-zA-Z0-9-]+'),              # Slack bot token
+    re.compile(r'xoxp-[a-zA-Z0-9-]+'),              # Slack user token
+    re.compile(r'AIza[a-zA-Z0-9_-]{35}'),           # Google API key
+    re.compile(r'-----BEGIN\s+(RSA\s+)?PRIVATE KEY-----[\s\S]*?-----END'),
+]
+
+
+def redact_secrets(text: str) -> str:
+    for pattern in SECRET_PATTERNS:
+        text = pattern.sub('[REDACTED]', text)
+    return text
 
 
 def init_db(conn):
@@ -84,6 +105,7 @@ def parse_session(filepath):
                 continue
             if content.strip().startswith("<command-name>/"):
                 continue
+            content = redact_secrets(content)
             ts = entry.get("timestamp", datetime.now(timezone.utc).isoformat())
             messages.append({"role": role, "content": content, "timestamp": ts})
     return messages
