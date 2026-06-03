@@ -62,7 +62,31 @@ def init_db(conn):
     conn.commit()
 
 
+def get_session_from_stdin():
+    """Read session info from Stop hook stdin JSON (transcript_path + session_id)."""
+    try:
+        data = json.loads(sys.stdin.read())
+        session_id = data.get("session_id", "")
+        transcript_path = data.get("transcript_path", "")
+        if not transcript_path:
+            return None, None, None
+        filepath = Path(transcript_path).expanduser()
+        if not filepath.exists():
+            return None, None, None
+        if not session_id:
+            session_id = filepath.stem
+        project = ""
+        parts = filepath.parts
+        idx = parts.index("projects") if "projects" in parts else -1
+        if idx >= 0 and idx + 1 < len(parts):
+            project = parts[idx + 1]
+        return filepath, session_id, project
+    except (json.JSONDecodeError, ValueError, OSError):
+        return None, None, None
+
+
 def find_latest_session():
+    """Fallback: find the most recently modified session JSONL (deprecated)."""
     jsonl_files = list(PROJECTS_DIR.rglob("*.jsonl"))
     if not jsonl_files:
         return None, None, None
@@ -132,12 +156,15 @@ def main():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     init_db(conn)
-    result = find_latest_session()
-    if result[0] is None:
+    # Prefer stdin-provided transcript_path from Stop hook
+    filepath, session_id, project = get_session_from_stdin()
+    if filepath is None:
+        # Fallback for environments where stdin is unavailable
+        filepath, session_id, project = find_latest_session()
+    if filepath is None:
         print("No session logs found", file=sys.stderr)
         conn.close()
         return
-    filepath, session_id, project = result
     messages = parse_session(filepath)
     if not messages:
         print(f"No messages in session {session_id}", file=sys.stderr)
