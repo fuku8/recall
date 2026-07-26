@@ -62,6 +62,14 @@ python3 search_memory.py "search query"
 python3 search_memory.py "search query" 20  # limit results
 ```
 
+Multiple words are ANDed: `"claude hooks"` matches messages containing both
+terms, not the literal phrase. When nothing matches, the query that was
+actually issued is printed so you can tell a typo from an over-narrow search.
+
+```bash
+python3 search_memory.py --selftest  # verify query building
+```
+
 ## Files
 
 | File | Purpose |
