@@ -8,12 +8,27 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DB_PATH = SCRIPT_DIR / "memory.db"
 
 
+def build_fts_query(query):
+    """Build an FTS5 query that ANDs each whitespace-separated term.
+
+    Quoting each term individually keeps FTS5 from treating it as an operator
+    while still producing an AND search. Wrapping the whole query in a single
+    pair of quotes makes it a phrase search, which silently returns nothing
+    for multi-word input.
+    """
+    return " AND ".join(
+        '"' + term.replace('"', '""') + '"' for term in query.split()
+    )
+
+
 def search(query, limit=10):
     if not DB_PATH.exists():
         print("No memory database found", file=sys.stderr)
         return []
+    escaped = build_fts_query(query)
+    if not escaped:
+        return []
     conn = sqlite3.connect(str(DB_PATH))
-    escaped = '"' + query.replace('"', '""') + '"'
     results = conn.execute("""
         SELECT
             m.id,
@@ -48,13 +63,32 @@ def format_results(results):
     return "\n---\n".join(output)
 
 
+def selftest():
+    """Minimal check for build_fts_query."""
+    assert build_fts_query("report") == '"report"'
+    assert build_fts_query("report output") == '"report" AND "output"'
+    assert build_fts_query("  a   b  ") == '"a" AND "b"'
+    assert build_fts_query('say "hi"') == '"say" AND """hi"""'
+    assert build_fts_query("") == ""
+    print("selftest OK")
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: search_memory.py <query> [limit]", file=sys.stderr)
         sys.exit(1)
+    if sys.argv[1] == "--selftest":
+        selftest()
+        return
     query = sys.argv[1]
     limit = int(sys.argv[2]) if len(sys.argv) > 2 else 10
     results = search(query, limit)
+    if not results:
+        # Don't fail silently - show the query that was actually issued.
+        fts = build_fts_query(query) or "(empty)"
+        print(f"No memories found. (query: {fts})")
+        print("Try fewer terms.", file=sys.stderr)
+        return
     print(format_results(results))
 
 
